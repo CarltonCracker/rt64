@@ -501,8 +501,7 @@ namespace RT64 {
         }
     }
 
-    template<bool addEmptyVelocity, uint32_t vertexSize>
-    void RSP::setVertexCommon(uint32_t rdramAddress, uint32_t dstIndex, uint32_t dstMax) {
+    void RSP::updateVertexState() {
         const int workloadCursor = state->ext.workloadQueue->writeCursor;
         Workload &workload = state->ext.workloadQueue->workloads[workloadCursor];
 
@@ -660,7 +659,17 @@ namespace RT64 {
         else {
             curLookAtIndex = 0;
         }
+    }
 
+    template<bool addEmptyVelocity, uint32_t vertexSize>
+    void RSP::setVertexCommon(uint32_t rdramAddress, uint32_t dstIndex, uint32_t dstMax) {
+        updateVertexState();
+
+        const int workloadCursor = state->ext.workloadQueue->writeCursor;
+        Workload &workload = state->ext.workloadQueue->workloads[workloadCursor];
+        const uint32_t &geometryMode = geometryModeStack[geometryModeStackSize - 1];
+        const uint32_t textureGenMask = G_LIGHTING | G_TEXTURE_GEN;
+        const bool usesTextureGen = (geometryMode & textureGenMask) == textureGenMask;
         auto &posFloats = workload.drawData.posFloats;
         auto &velFloats = workload.drawData.velFloats;
         auto &tcFloats = workload.drawData.tcFloats;
@@ -1166,6 +1175,113 @@ namespace RT64 {
 
     void RSP::drawIndexedTri(uint32_t a, uint32_t b, uint32_t c) {
         drawIndexedTri(a, b, c, false);
+    }
+
+    void RSP::drawLine3D(uint8_t v0, uint8_t v1, uint8_t wd) {
+        const int workloadCursor = state->ext.workloadQueue->writeCursor;
+        Workload &workload = state->ext.workloadQueue->workloads[workloadCursor];
+        DrawData &drawData = workload.drawData;
+
+        const uint32_t startGlobalIndex = indices[v0],
+                       endGlobalIndex = indices[v1];
+
+        const hlslpp::float4 startPositionTransformed = drawData.posTransformed[startGlobalIndex],
+                             endPositionTransformed = drawData.posTransformed[endGlobalIndex];
+
+        const hlslpp::float3 startPositionScreen = drawData.posScreen[startGlobalIndex],
+                             endPositionScreen = drawData.posScreen[endGlobalIndex];
+
+        // if transformed w is negative then the line is behind the camera and not visible
+        if (startPositionTransformed[3] <= 0.0f || endPositionTransformed[3] <= 0.0f) {
+            return;
+        }
+
+        const hlslpp::float2 screenVector = endPositionScreen.xy - startPositionScreen.xy;
+        hlslpp::float2 screenVectorNormal(-screenVector.y, screenVector.x);
+        const float lengthSquared = hlslpp::dot(screenVectorNormal, screenVectorNormal);
+        const float width = 1.5f + static_cast<float>(wd) * 0.5f; // formula according the ultra64 documentation
+        const float halfWidth = width * 0.5f;
+
+        if (lengthSquared > 0.0001f) {
+            screenVectorNormal = hlslpp::normalize(screenVectorNormal);
+        }
+
+        const interop::RSPViewport &viewport = viewportStack[viewportStackSize - 1];
+        // NOTE: y is somehow flipped
+        const hlslpp::float4 offset(
+            halfWidth * screenVectorNormal[0] / viewport.scale.x,
+            -halfWidth * screenVectorNormal[1] / viewport.scale.y,
+            0.0f,
+            0.0f
+        );
+
+        // Update MVP like when doing setVertexCommon
+        updateVertexState();
+
+        // Add corner vertices that are used to draw the line segment
+        const hlslpp::float4x4 invModelViewProjMatrix = hlslpp::inverse(modelViewProjMatrix);
+        uint32_t cornerIndices[4];
+        for (uint32_t i = 0; i < 4; i++) {
+            // The first two corner vertices use the data from the startVertex
+            // The other/last two corner vertices use the data from the endVertex
+            const uint32_t srcIndex = i & 0x2 ? startGlobalIndex : endGlobalIndex;
+            const float sign = i & 0x1 ? -1.0f : 1.0f;
+
+            const hlslpp::float4 &srcPositionTransformed = i & 0x2 ? startPositionTransformed : endPositionTransformed;
+            const hlslpp::float4 cornerPositionTransformed = srcPositionTransformed + offset * sign * srcPositionTransformed.w;
+            const hlslpp::float4 objPos = hlslpp::mul(cornerPositionTransformed, invModelViewProjMatrix);
+            const hlslpp::float3 pos = objPos.xyz / objPos.w;
+            const hlslpp::float4 tfPos = hlslpp::mul(hlslpp::float4(pos, 1.0f), modelViewProjMatrix);
+            const uint8_t normCol[4] = {
+                drawData.normColBytes[srcIndex * 4 + 0], drawData.normColBytes[srcIndex * 4 + 1],
+                drawData.normColBytes[srcIndex * 4 + 2], drawData.normColBytes[srcIndex * 4 + 3]
+            };
+
+            const float tc[2] = { drawData.tcFloats[srcIndex * 2 + 0], drawData.tcFloats[srcIndex * 2 + 1] };
+            const uint16_t fogIndex = drawData.fogIndices[srcIndex];
+            const uint16_t lightIndex = drawData.lightIndices[srcIndex];
+            const uint8_t lightCount = drawData.lightCounts[srcIndex];
+            const uint16_t lookAtIndex = drawData.lookAtIndices[srcIndex];
+
+            // Add vertex to the draw data
+            cornerIndices[i] = drawData.vertexCount();
+            drawData.posFloats.emplace_back(pos[0]);
+            drawData.posFloats.emplace_back(pos[1]);
+            drawData.posFloats.emplace_back(pos[2]);
+            drawData.velFloats.emplace_back(0.0f);
+            drawData.velFloats.emplace_back(0.0f);
+            drawData.velFloats.emplace_back(0.0f);
+            drawData.tcFloats.emplace_back(tc[0]);
+            drawData.tcFloats.emplace_back(tc[1]);
+            drawData.tcVelFloats.emplace_back(0.0f);
+            drawData.tcVelFloats.emplace_back(0.0f);
+            drawData.normColBytes.emplace_back(normCol[0]);
+            drawData.normColBytes.emplace_back(normCol[1]);
+            drawData.normColBytes.emplace_back(normCol[2]);
+            drawData.normColBytes.emplace_back(normCol[3]);
+            drawData.viewProjIndices.emplace_back(curViewProjIndex);
+            drawData.worldIndices.emplace_back(curTransformIndex);
+            drawData.fogIndices.emplace_back(fogIndex);
+            drawData.lightIndices.emplace_back(lightIndex);
+            drawData.lightCounts.emplace_back(lightCount);
+            drawData.lookAtIndices.emplace_back(lookAtIndex);
+            drawData.posTransformed.emplace_back(tfPos);
+            drawData.posScreen.emplace_back((tfPos.xyz / hlslpp::float3(tfPos.w, -tfPos.w, tfPos.w)) * viewport.scale + viewport.translate);
+        }
+
+        // Save culling state and disable culling
+        const uint32_t cullMode = geometryModeStack[geometryModeStackSize - 1] & cullBothMask;
+        if (cullMode != 0) {
+            clearGeometryMode(cullBothMask);
+        }
+
+        drawIndexedTri(cornerIndices[0], cornerIndices[2], cornerIndices[1], true);
+        drawIndexedTri(cornerIndices[1], cornerIndices[2], cornerIndices[3], true);
+
+        // Restore culling
+        if (cullMode != 0) {
+            setGeometryMode(cullMode);
+        }
     }
 
     void RSP::setViewportAlign(uint16_t ori, int16_t offx, int16_t offy) {

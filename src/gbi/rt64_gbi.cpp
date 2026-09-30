@@ -15,6 +15,7 @@
 #include "rt64_gbi_f3dex2.h"
 #include "rt64_gbi_f3dwave.h"
 #include "rt64_gbi_f3dzex2.h"
+#include "rt64_gbi_l3d.h"
 #include "rt64_gbi_l3dex2.h"
 #include "rt64_gbi_rdp.h"
 #include "rt64_gbi_s2dex.h"
@@ -144,7 +145,7 @@ namespace RT64 {
     const GBIInstance   S2DEX2_FIFO_2_08          = { "S2DEX2.fifo 2.08",                          GBIUCode::S2DEX2,      { false,  false,  false,  false,  false } };
     const GBIInstance   S2DEX2_XBUS_2_06          = { "S2DEX2.xbus 2.06",                          GBIUCode::S2DEX2,      { false,  false,  false,  false,  false } }; // Needs confirmation.
     const GBIInstance   S2DEX2_XBUS_2_08          = { "S2DEX2.xbus 2.08",                          GBIUCode::S2DEX2,      { false,  false,  false,  false,  false } }; // Needs confirmation.
-    const GBIInstance   L3D_BC                    = { "2.0D, 04-01-96 (L3D Blast Corps)",          GBIUCode::Unknown,     { false,  false,  false,  false,  false } }; // Needs confirmation.
+    const GBIInstance   L3D_BC                    = { "2.0D, 04-01-96 (L3D Blast Corps)",          GBIUCode::L3D,         { false,  false,  false,  false,  false } };
     const GBIInstance   L3DEX_1_00                = { "L3DEX 1.00",                                GBIUCode::Unknown,     { false,  false,  false,  false,  false } }; // Needs confirmation.
     const GBIInstance   L3DEX_1_21                = { "L3DEX 1.21",                                GBIUCode::Unknown,     { false,  false,  false,  false,  false } }; // Needs confirmation.
     const GBIInstance   L3DEX_1_23                = { "L3DEX 1.23",                                GBIUCode::Unknown,     { false,  false,  false,  false,  false } }; // Needs confirmation.
@@ -498,6 +499,9 @@ namespace RT64 {
                 break;
             case GBIUCode::L3DEX2:
                 GBI_L3DEX2::setup(&gbi);
+                break;
+            case GBIUCode::L3D:
+                GBI_L3D::setup(&gbi);
                 break;
             default:
                 assert(false && "Unknown UCode.");

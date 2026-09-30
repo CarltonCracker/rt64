@@ -258,6 +258,7 @@ namespace RT64 {
         void setVertexSegmentV1(bool isEnabled, uint32_t vertexElement, uint32_t vertexAddress, uint32_t baseSegmentAddress);
         template<uint32_t floatCount, uint32_t vertexSize>
         void readExtendedVertexSegment(uint32_t rdramAddress, uint32_t dstIndex, uint32_t dstMax, uint32_t globalIndex, uint32_t vertexElement, std::vector<float> &floatsVector);
+        void updateVertexState();
         template<bool addEmptyVelocity, uint32_t vertexSize>
         void setVertexCommon(uint32_t rdramAddress, uint32_t dstIndex, uint32_t dstMax);
         void modifyVertex(uint16_t dstIndex, uint16_t dstAttribute, uint32_t value);
@@ -293,6 +294,7 @@ namespace RT64 {
         void setTextureImage(uint8_t fmt, uint8_t siz, uint16_t width, uint32_t segAddress);
         void drawIndexedTri(uint32_t a, uint32_t b, uint32_t c, bool rawGlobalIndices);
         void drawIndexedTri(uint32_t a, uint32_t b, uint32_t c);
+        void drawLine3D(uint8_t v0, uint8_t v1, uint8_t wd);
         void setViewportAlign(uint16_t ori, int16_t offx, int16_t offy);
         void vertexTestZ(uint8_t vtxIndex);
         void endVertexTestZ();
