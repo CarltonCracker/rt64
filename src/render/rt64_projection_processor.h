@@ -7,6 +7,7 @@
 #include "hle/rt64_game_frame.h"
 
 #include "rt64_buffer_uploader.h"
+#include "vr/rt64_vr.h"
 
 namespace RT64 {
     struct ProjectionProcessor {
@@ -21,6 +22,7 @@ namespace RT64 {
             float curFrameWeight = 1.0f;
             float prevFrameWeight = 0.0f;
             float aspectRatioScale = 1.0f;
+            const VREyeOverride *vrEye = nullptr;
         };
 
         ProjectionProcessor();

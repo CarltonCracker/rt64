@@ -13,6 +13,8 @@ option(RT64_STATIC "Build RT64 as a static library" OFF)
 
 option(RT64_SDL_WINDOW_VULKAN "Build RT64 to expect an SDL Window outside of Windows" OFF)
 
+option(RT64_VR "Build RT64 with OpenXR output support (Windows and D3D12 only)" ON)
+
 if (NOT ${RT64_STATIC})
     set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 endif()
@@ -376,6 +378,7 @@ set (SOURCES
     "${PROJECT_SOURCE_DIR}/src/render/rt64_native_target.cpp"
     "${PROJECT_SOURCE_DIR}/src/render/rt64_optimus.cpp"
     "${PROJECT_SOURCE_DIR}/src/render/rt64_projection_processor.cpp"
+    "${PROJECT_SOURCE_DIR}/src/vr/rt64_vr.cpp"
     "${PROJECT_SOURCE_DIR}/src/render/rt64_raster_shader.cpp"
     "${PROJECT_SOURCE_DIR}/src/render/rt64_raster_shader_cache.cpp"
     "${PROJECT_SOURCE_DIR}/src/render/rt64_render_target.cpp"
@@ -478,6 +481,25 @@ if (WIN32)
         ${PROJECT_SOURCE_DIR}/src/contrib/dxc/lib/x64/dxcompiler.lib)
 
     target_include_directories(rt64 PRIVATE ${zstd_SOURCE_DIR}/lib)
+
+    # OpenXR output.
+    if (RT64_VR)
+        include(FetchContent)
+        set(BUILD_LOADER ON CACHE BOOL "" FORCE)
+        set(BUILD_API_LAYERS OFF CACHE BOOL "" FORCE)
+        set(BUILD_TESTS OFF CACHE BOOL "" FORCE)
+        set(BUILD_CONFORMANCE_TESTS OFF CACHE BOOL "" FORCE)
+        set(BUILD_WITH_SYSTEM_JSONCPP OFF CACHE BOOL "" FORCE)
+        set(DYNAMIC_LOADER OFF CACHE BOOL "" FORCE)
+        FetchContent_Declare(
+            openxr_sdk
+            GIT_REPOSITORY https://github.com/KhronosGroup/OpenXR-SDK.git
+            GIT_TAG f2448a8797c85814aa892efc1ab8707900fbcc78 # release-1.1.63
+        )
+        FetchContent_MakeAvailable(openxr_sdk)
+        target_link_libraries(rt64 OpenXR::openxr_loader)
+        target_compile_definitions(rt64 PRIVATE RT64_VR_OPENXR=1)
+    endif()
 endif()
 
 target_link_directories(rt64 PRIVATE ${PROJECT_SOURCE_DIR}/src/contrib/dxc)

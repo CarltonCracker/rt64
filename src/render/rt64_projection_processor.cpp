@@ -140,6 +140,14 @@ namespace RT64 {
                 prevProjTransform = projMatrix;
             }
 
+            // VR eye override. Applied on top of the interpolated game camera.
+            if ((p.vrEye != nullptr) && (proj.type == Projection::Type::Perspective) && p.vrEye->matchesProjection(curProjGroup.matrixId, drawData.viewTransforms[proj.transformsIndex])) {
+                viewMatrix = p.vrEye->applyView(viewMatrix);
+                prevViewTransform = p.vrEye->applyView(prevViewTransform);
+                projMatrix = p.vrEye->projection(projMatrix);
+                prevProjTransform = projMatrix;
+            }
+
             viewProjMatrix = hlslpp::mul(viewMatrix, projMatrix);
 
             interop::float4x4 &prevViewProjTransform = drawData.prevViewProjTransforms[proj.transformsIndex];

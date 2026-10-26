@@ -21,6 +21,7 @@
 #include "render/rt64_render_worker.h"
 #include "render/rt64_shader_library.h"
 #include "plume_render_interface.h"
+#include "vr/rt64_vr.h"
 
 #include "rt64_application_window.h"
 #include "rt64_interpreter.h"
@@ -110,6 +111,7 @@ namespace RT64 {
         UserConfiguration::GraphicsAPI chosenGraphicsAPI;
         bool freeCamClearQueued;
         UserPaths userPaths;
+        std::unique_ptr<VRSystem> vrSystem;
         std::unique_ptr<Interpreter> interpreter;
         std::unique_ptr<State> state;
         std::unique_ptr<ApplicationWindow> appWindow;

@@ -18,6 +18,7 @@
 
 #include "rt64_shared_queue_resources.h"
 #include "rt64_workload.h"
+#include "vr/rt64_vr.h"
 
 #if RT_ENABLED
 #   include "render/rt64_raytracing_shader_cache.h"
@@ -41,6 +42,7 @@ namespace RT64 {
             TextureCache *textureCache = nullptr;
             const ShaderLibrary *shaderLibrary = nullptr;
             UserConfiguration::GraphicsAPI createdGraphicsAPI = UserConfiguration::GraphicsAPI::OptionCount;
+            VRSystem *vrSystem = nullptr;
 #       if RT_ENABLED
             const RenderTexture *blueNoiseTexture = nullptr;
             RaytracingShaderCache *rtShaderCache = nullptr;
@@ -97,6 +99,7 @@ namespace RT64 {
         ProfilingTimer rendererGPUProfiler = ProfilingTimer(120);
         ProfilingTimer matchingProfiler = ProfilingTimer(120);
         ProfilingTimer workloadProfiler = ProfilingTimer(120);
+        std::array<std::unique_ptr<RenderTarget>, 2> vrEyeTargets;
         std::array<GameFrame, 2> gameFrames;
         uint32_t prevFrameIndex = uint32_t(gameFrames.size()) - 1;
         uint32_t curFrameIndex = 0;
@@ -116,7 +119,9 @@ namespace RT64 {
         void threadRenderFrame(GameFrame &curFrame, const GameFrame &prevFrame, const WorkloadConfiguration &workloadConfig,
             const DebuggerRenderer &debuggerRenderer, const DebuggerCamera &debuggerCamera, float curFrameWeight, float prevFrameWeight,
             float deltaTimeMs, RenderTargetKey overrideTargetKey, int32_t overrideTargetFbPairIndex, RenderTarget *overrideTarget,
-            uint32_t overrideTargetModifier, bool uploadVelocity, bool uploadExtras, bool interpolateTiles, bool interpolateLookAts);
+            uint32_t overrideTargetModifier, bool uploadVelocity, bool uploadExtras, bool interpolateTiles, bool interpolateLookAts, const VREyeOverride *vrEye);
+
+        void threadSubmitVREye(uint32_t eyeIndex, RenderTarget *colorTarget, uint32_t nativeWidth, uint32_t nativeHeight, const WorkloadConfiguration &workloadConfig);
 
         void threadAdvanceBarrier();
         void threadAdvanceWorkloadId(uint64_t newWorkloadId);

@@ -132,6 +132,15 @@ namespace RT64 {
         // Resolve the graphics API option in case it's automatic.
         chosenGraphicsAPI = UserConfiguration::resolveGraphicsAPI(userConfig.graphicsAPI);
 
+        // VR output is only implemented for D3D12.
+        const bool vrRequested = VRSystem::requested();
+#   ifdef _WIN64
+        if (vrRequested && (chosenGraphicsAPI != UserConfiguration::GraphicsAPI::D3D12)) {
+            fprintf(stdout, "[RT64 VR] Using D3D12 for VR output.\n");
+            chosenGraphicsAPI = UserConfiguration::GraphicsAPI::D3D12;
+        }
+#   endif
+
 #   ifdef _WIN64
         // Windows can try falling back to the other API option in case of failure.
         const uint32_t CreationAttempts = (userConfig.graphicsAPI == UserConfiguration::GraphicsAPI::Automatic) ? 2 : 1;
@@ -303,6 +312,11 @@ namespace RT64 {
             break;
         }
 
+        // The eyes are copied directly into 8-bit swapchains.
+        if (vrRequested) {
+            usesHDR = false;
+        }
+
         // Call the init hook if one was attached.
         RenderHookInit *initHook = GetRenderHookInit();
         if (initHook != nullptr) {
@@ -414,6 +428,15 @@ namespace RT64 {
         blueNoiseUploadBuffer.reset();
 #   endif
 
+        // Start the VR session if it was requested. The game keeps running on the desktop window only if it fails.
+        if (vrRequested) {
+            vrSystem = std::make_unique<VRSystem>();
+            if (!vrSystem->setup(device.get(), workloadGraphicsWorker->commandQueue.get())) {
+                fprintf(stderr, "[RT64 VR] Unable to start VR. Continuing without it.\n");
+                vrSystem.reset();
+            }
+        }
+
         // Create the queues.
         workloadQueue = std::make_unique<WorkloadQueue>();
         presentQueue = std::make_unique<PresentQueue>();
@@ -440,6 +463,7 @@ namespace RT64 {
         workloadExt.textureCache = textureCache.get();
         workloadExt.shaderLibrary = shaderLibrary.get();
         workloadExt.createdGraphicsAPI = chosenGraphicsAPI;
+        workloadExt.vrSystem = vrSystem.get();
 #   if RT_ENABLED
         workloadExt.rtShaderCache = rtShaderCache.get();
         workloadExt.blueNoiseTexture = blueNoiseTexture.texture.get();
@@ -706,6 +730,7 @@ namespace RT64 {
         state.reset();
         workloadQueue.reset();
         presentQueue.reset();
+        vrSystem.reset();
 
         // Call the deinit hook if one was attached.
         RenderHookDeinit *deinitHook = GetRenderHookDeinit();
